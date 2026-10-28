@@ -151,17 +151,18 @@ ellmer_req_connect_viewer <- function(req) {
 
 # The token is only ever sent back to the Connect server that injected it.
 is_connect_gateway_url <- function(url) {
-  server <- Sys.getenv("CONNECT_SERVER")
-  if (identical(server, "")) {
+  # Connect sets CONNECT_GATEWAY_URL to the root URL of its LLM gateway
+  gateway <- Sys.getenv("CONNECT_GATEWAY_URL")
+  if (identical(gateway, "")) {
     return(FALSE)
   }
-  server <- url_parse(server)
+  gateway <- url_parse(gateway)
   url <- url_parse(url)
-  prefix <- sub("/+$", "", server$path %||% "")
-  identical(tolower(url$scheme), tolower(server$scheme)) &&
-    identical(tolower(url$hostname), tolower(server$hostname)) &&
-    identical(url$port, server$port) &&
-    startsWith(url$path %||% "", paste0(prefix, "/__gateway__/"))
+  prefix <- paste0(sub("/+$", "", gateway$path %||% ""), "/")
+  identical(tolower(url$scheme), tolower(gateway$scheme)) &&
+    identical(tolower(url$hostname), tolower(gateway$hostname)) &&
+    identical(url$port, gateway$port) &&
+    startsWith(url$path %||% "", prefix)
 }
 
 connect_session_token <- function() {

@@ -1,5 +1,7 @@
 test_that("viewer token is forwarded only to Connect's gateway", {
-  withr::local_envvar(CONNECT_SERVER = "https://connect.example.com/")
+  withr::local_envvar(
+    CONNECT_GATEWAY_URL = "https://connect.example.com/__gateway__/"
+  )
   local_mocked_bindings(connect_session_token = \() "token")
 
   req <- request("https://connect.example.com/__gateway__/anthropic/guid/v1")
@@ -15,6 +17,11 @@ test_that("viewer token is forwarded only to Connect's gateway", {
   req <- ellmer_req_connect_viewer(req)
   expect_equal(req_get_headers(req, "reveal"), list())
 
+  # A path that only shares a string prefix with the gateway is not the gateway.
+  req <- request("https://connect.example.com/__gateway__x/anthropic/guid/v1")
+  req <- ellmer_req_connect_viewer(req)
+  expect_equal(req_get_headers(req, "reveal"), list())
+
   # A host that only shares a string prefix with the server is not the server.
   req <- request("https://connect.example.com.evil.com/__gateway__/x")
   req <- ellmer_req_connect_viewer(req)
@@ -23,7 +30,7 @@ test_that("viewer token is forwarded only to Connect's gateway", {
 
 test_that("viewer token is forwarded when Connect is on a sub-path", {
   withr::local_envvar(
-    CONNECT_SERVER = "https://proxy.example.com/positconnect/"
+    CONNECT_GATEWAY_URL = "https://proxy.example.com/positconnect/__gateway__/"
   )
   local_mocked_bindings(connect_session_token = \() "token")
 
@@ -39,8 +46,20 @@ test_that("viewer token is forwarded when Connect is on a sub-path", {
   expect_equal(req_get_headers(req, "reveal"), list())
 })
 
+test_that("viewer token is not forwarded based on CONNECT_SERVER", {
+  withr::local_envvar(
+    CONNECT_GATEWAY_URL = NA,
+    CONNECT_SERVER = "https://connect.example.com/"
+  )
+  local_mocked_bindings(connect_session_token = \() "token")
+
+  req <- request("https://connect.example.com/__gateway__/anthropic/guid/v1")
+  req <- ellmer_req_connect_viewer(req)
+  expect_equal(req_get_headers(req, "reveal"), list())
+})
+
 test_that("viewer token is never sent off Connect", {
-  withr::local_envvar(CONNECT_SERVER = NA)
+  withr::local_envvar(CONNECT_GATEWAY_URL = NA)
   local_mocked_bindings(connect_session_token = \() "token")
 
   req <- request("https://connect.example.com/__gateway__/anthropic/guid/v1")
@@ -49,7 +68,9 @@ test_that("viewer token is never sent off Connect", {
 })
 
 test_that("viewer token is redacted from the request", {
-  withr::local_envvar(CONNECT_SERVER = "https://connect.example.com")
+  withr::local_envvar(
+    CONNECT_GATEWAY_URL = "https://connect.example.com/__gateway__/"
+  )
   local_mocked_bindings(connect_session_token = \() "token")
 
   req <- request("https://connect.example.com/__gateway__/anthropic/guid/v1")
@@ -67,7 +88,7 @@ test_that("viewer token is redacted from the request", {
 test_that("viewer token is read from the shiny session", {
   skip_if_not_installed("shiny")
   withr::local_envvar(
-    CONNECT_SERVER = "https://connect.example.com",
+    CONNECT_GATEWAY_URL = "https://connect.example.com/__gateway__/",
     RSTUDIO_PRODUCT = "CONNECT"
   )
 
@@ -85,7 +106,7 @@ test_that("viewer token is read from the shiny session", {
 test_that("session token is not read when not running on Connect", {
   skip_if_not_installed("shiny")
   withr::local_envvar(
-    CONNECT_SERVER = "https://connect.example.com",
+    CONNECT_GATEWAY_URL = "https://connect.example.com/__gateway__/",
     RSTUDIO_PRODUCT = NA
   )
 
@@ -100,7 +121,9 @@ test_that("session token is not read when not running on Connect", {
 })
 
 test_that("request is unchanged without a session", {
-  withr::local_envvar(CONNECT_SERVER = "https://connect.example.com")
+  withr::local_envvar(
+    CONNECT_GATEWAY_URL = "https://connect.example.com/__gateway__/"
+  )
 
   req <- request("https://connect.example.com/__gateway__/anthropic/guid/v1")
   req <- ellmer_req_connect_viewer(req)
